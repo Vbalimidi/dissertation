@@ -17,18 +17,25 @@ class LlamaServerlessCaptioner:
             api_key=credentials.token
         )
 
-    def describe(self, frame):
-        _, buffer = cv2.imencode(".jpg", frame)
+    def describe(self, frame, custom_prompt=None):
+
+        if custom_prompt:
+            prompt_text = custom_prompt
+        else:
+            prompt_text = "Describe this scene for a blind person. Mention all objects and positions."
+        
+        resised_frame = cv2.resize(frame, (512, 512))
+        _, buffer = cv2.imencode(".jpg", resised_frame)
         base64_image = base64.b64encode(buffer).decode("utf-8")
 
         try:
             response = self.client.chat.completions.create(
-                model="llama-4-maverick-17b-128e-instruct-maas",
+                model="meta/llama-4-maverick-17b-128e-instruct-maas",
                 messages=[
                     {
                         "role": "user",
                         "content": [
-                            {"type": "text", "text": "Describe this scene for a blind person in one clear sentence. Mention objects and their positions."},
+                            {"type": "text", "text": prompt_text},
                             {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
                         ],
                     }

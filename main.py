@@ -9,22 +9,19 @@ from src.perception.detector import ObjectDetector
 from src.navigation.navigation import direction_from_box, distance_from_box, navigation_instruction
 from src.navigation.target import target_reached
 
-class MaverickCaptioner:
+class LlamaCaptioner:
     def __init__(self, project_id, location="us-east5"):
         self.project_id = project_id
-        # Get credentials from your gcloud login
         credentials, _ = default()
         auth_request = google.auth.transport.requests.Request()
         credentials.refresh(auth_request)
 
-        # Set up OpenAI client for Google's Maverick endpoint
         self.client = OpenAI(
             base_url=f"https://{location}-aiplatform.googleapis.com/v1beta1/projects/{project_id}/locations/{location}/endpoints/openapi",
             api_key=credentials.token
         )
 
-    def describe(self, frame):
-        # Resize image for faster upload (approx 512px)
+    def describe(self, frame, custom_prompt=None):
         resized = cv2.resize(frame, (512, 512))
         _, buffer = cv2.imencode(".jpg", resized)
         b64_image = base64.b64encode(buffer).decode("utf-8")
@@ -39,11 +36,40 @@ class MaverickCaptioner:
                         {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64_image}"}}
                     ]
                 }],
-                max_tokens=80
+                max_tokens=150
             )
             return response.choices[0].message.content
         except Exception as e:
             return f"Maverick Error: {str(e)}"
+        
+class StatefulNavigator:
+    def __init__(self, frame_width, frame_height):
+        self.frame_width = frame_width
+        self.frame_height = frame_height
+        self.last_valid_bbox = None
+        self.frames_since_seen = 0
+        self.max_memory_frames = 30 
+        self.vlm_recovery_attempts = 0
+
+    def get_instruction(self, target_obj, objects, boxes):
+        matches = [box for obj, box in zip(objects, boxes) if target_obj in obj.lower()]
+        
+        if matches:
+            self.last_valid_bbox = matches[0]
+            self.frames_since_seen = 0
+            self.vlm_recovery_attempts = 0 
+            return self._gen_msg(self.last_valid_bbox), False
+
+        if self.last_valid_bbox is not None and self.frames_since_seen < self.max_memory_frames:
+            self.frames_since_seen += 1
+            return f"[Memory] {self._gen_msg(self.last_valid_bbox)}", False
+
+        return f"Searching for {target_obj}...", True
+
+    def _gen_msg(self, bbox):
+        dir_ = direction_from_box(bbox, self.frame_width)
+        dist = distance_from_box(bbox, self.frame_height)
+        return navigation_instruction(dir_, dist)
 
 class SystemState:
     IDLE = "idle"
@@ -52,13 +78,14 @@ class SystemState:
     NAVIGATION = "navigation"
 
 def main():
-    # --- CONFIGURATION ---
-    # Replace with your actual project ID from 'gcloud config get-value project'
     PROJECT_ID = "dissertation-487215" 
     
     camera = Camera()
     detector = ObjectDetector()
-    maverick = MaverickCaptioner(PROJECT_ID)
+    Llama = LlamaCaptioner(PROJECT_ID)
+
+    ret, init_frame = camera.read()
+    nav_logic = StatefulNavigator(init_frame.shape[1], init_frame.shape[0])
 
     state = SystemState.IDLE
     target_object = None
@@ -70,44 +97,40 @@ def main():
         ret, frame = camera.read()
         if not ret: break
 
-        # Always run local YOLO for real-time bounding boxes
         objects, boxes, frame = detector.detect(frame)
         key = cv2.waitKey(1) & 0xFF
 
-        # 1. IDLE: Wait for user to trigger description
         if state == SystemState.IDLE:
             if key == ord("d"):
                 state = SystemState.SCENE_DESCRIPTION
 
-        # 2. SCENE DESCRIPTION: Use Llama 4 for high-level understanding
         elif state == SystemState.SCENE_DESCRIPTION:
             print("[System] Capturing scene...")
-            caption = maverick.describe(frame)
-            print(f"\n[Llama 4 Maverick]: {caption}\n")
+            caption = Llama.describe(frame)
+            print(f"\n[Llama 4]: {caption}\n")
             state = SystemState.TARGET_SELECTION
 
-        # 3. TARGET SELECTION: User chooses an object to navigate to
         elif state == SystemState.TARGET_SELECTION:
             target_object = input("Which object should I guide you to? ").lower()
             print(f"Targeting: {target_object}")
             state = SystemState.NAVIGATION
 
-        # 4. NAVIGATION: Local YOLO handles the precise guidance
         elif state == SystemState.NAVIGATION:
-            matches = [(obj, box) for obj, box in zip(objects, boxes) if target_object in obj.lower()]
+            instruction, lost_too_long = nav_logic.get_instruction(target_object, objects, boxes)
 
-            if not matches:
-                instruction = f"Looking for {target_object}..."
-            else:
-                _, bbox = matches[0]
-                dir_ = direction_from_box(bbox, frame.shape[1])
-                dist = distance_from_box(bbox, frame.shape[0])
-                instruction = navigation_instruction(dir_, dist)
+            if lost_too_long:
+                if nav_logic.vlm_recovery_attempts % 60 == 0:
+                    print(f"[System] YOLO lost {target_object}. Asking VLM for help...")
+                    prompt = f"I am looking for a {target_object}. Is it in the center, left, or right of the image?"
+                    vlm_hint = Llama.describe(frame, custom_prompt=prompt)
+                    instruction = f"[VLM Hint]: {vlm_hint}"
+                nav_logic.vlm_recovery_attempts += 1
 
-                if target_reached(bbox, frame.shape):
-                    instruction = "Stop. You have reached the object."
-                    state = SystemState.IDLE
-                    target_object = None
+            if nav_logic.last_valid_bbox and target_reached(nav_logic.last_valid_bbox, frame.shape):
+                instruction = "Stop. You have reached the object."
+                state = SystemState.IDLE
+                target_object = None
+                nav_logic.last_valid_bbox = None
 
             if instruction != last_nav_instruction:
                 print(f"[NAV]: {instruction}")
