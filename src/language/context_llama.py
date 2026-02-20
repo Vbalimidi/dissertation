@@ -3,7 +3,7 @@ import cv2
 import openai
 from google.auth import default, transport
 
-class LlamaServerlessCaptioner:
+class LlamaCaptioner:
     def __init__(self, project_id, location="us-central1"):
         self.project_id = project_id
         self.location = location
@@ -18,30 +18,31 @@ class LlamaServerlessCaptioner:
         )
 
     def describe(self, frame, custom_prompt=None):
-
-        if custom_prompt:
-            prompt_text = custom_prompt
-        else:
-            prompt_text = "Describe this scene for a blind person. Mention all objects and positions."
+        prompt = custom_prompt or "Describe the scene in detail, including objects, their relationships, and any notable features."
         
-        resised_frame = cv2.resize(frame, (512, 512))
-        _, buffer = cv2.imencode(".jpg", resised_frame)
-        base64_image = base64.b64encode(buffer).decode("utf-8")
+        imageb64 = self.encode_frame(frame)
 
-        try:
-            response = self.client.chat.completions.create(
-                model="meta/llama-4-maverick-17b-128e-instruct-maas",
-                messages=[
+        response = self.client.chat.completions.create(
+            model="meta/llama-4-maverick-17b-128e-instruct-maas",
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
                     {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": prompt_text},
-                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
-                        ],
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{imageb64}"
+                        }
                     }
-                ],
-                max_tokens=150
-            )
-            return response.choices[0].message.content
-        except Exception as e:
-            return f"Cloud API Error: {str(e)}"
+                ]
+            }],
+            max_tokens=150
+        )
+
+        return response.choices[0].message.content
+
+    @staticmethod
+    def _encode_frame(frame):
+        frame = cv2.resize(frame, (512, 512))
+        _, buffer = cv2.imencode(".jpg", frame)
+        return base64.b64encode(buffer).decode("utf-8")
