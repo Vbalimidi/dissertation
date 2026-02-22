@@ -13,6 +13,8 @@ from src.perception.detector import ObjectDetector
 from src.navigation.navigation import target_reached
 from src.language.context_llama import LlamaCaptioner
 from src.navigation.navigationVLM import StatefulNavigator
+# from src.audio.tts import Speaker   
+# from src.audio.stt import Listener
 
 def main():
     PROJECT_ID = "lithe-totem-488012-b8"

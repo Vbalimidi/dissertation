@@ -1,7 +1,8 @@
 import base64
 import cv2
 import openai
-from google.auth import default, transport
+from google.auth import default
+from google.auth.transport.requests import Request
 
 class LlamaCaptioner:
     def __init__(self, project_id, location="us-east5"):
@@ -9,7 +10,7 @@ class LlamaCaptioner:
         self.location = location
         
         credentials, _ = default()
-        auth_request = transport.requests.Request()
+        auth_request = Request()
         credentials.refresh(auth_request)
 
         self.client = openai.OpenAI(
