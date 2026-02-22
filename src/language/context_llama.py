@@ -4,7 +4,7 @@ import openai
 from google.auth import default, transport
 
 class LlamaCaptioner:
-    def __init__(self, project_id, location="us-central1"):
+    def __init__(self, project_id, location="us-east5"):
         self.project_id = project_id
         self.location = location
         
@@ -18,8 +18,7 @@ class LlamaCaptioner:
         )
 
     def describe(self, frame, custom_prompt=None):
-        prompt = custom_prompt or "Describe the scene in detail, including objects, their relationships, and any notable features."
-        
+        prompt = custom_prompt or "Describes what objects you see in the image of a room and their spatial relationships so that a visually impaired person can understand the scene. Be concise and use the format I see a [object] on the [location] of the room. There is a [object] next to it"
         imageb64 = self.encode_frame(frame)
 
         response = self.client.chat.completions.create(
@@ -42,7 +41,7 @@ class LlamaCaptioner:
         return response.choices[0].message.content
 
     @staticmethod
-    def _encode_frame(frame):
-        frame = cv2.resize(frame, (512, 512))
+    def encode_frame(frame):
+        frame = cv2.resize(frame, (224, 224))
         _, buffer = cv2.imencode(".jpg", frame)
         return base64.b64encode(buffer).decode("utf-8")

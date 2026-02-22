@@ -1,4 +1,3 @@
-import google.auth.transport.requests
 import cv2
 import base64
 import time
@@ -16,11 +15,11 @@ from src.language.context_llama import LlamaCaptioner
 from src.navigation.navigationVLM import StatefulNavigator
 
 def main():
-    PROJECT_ID = "dissertation-487215"
+    PROJECT_ID = "lithe-totem-488012-b8"
 
     camera = Camera()
     detector = ObjectDetector()
-    captioner = LlamaCaptioner(PROJECT_ID)
+    captioner = LlamaCaptioner(PROJECT_ID, location="us-east5")
 
     ret, frame = camera.read()
     if not ret:
@@ -31,6 +30,7 @@ def main():
     target_object = None
     last_instruction = ""
     asked_for_target = False
+    last_direction = None
 
     print("--- System Ready ---")
     print("Press 'd' to describe the scene and select a target.")
@@ -52,9 +52,20 @@ def main():
             target_object = input("Which object should I guide you to? ").strip().lower()
             asked_for_target = True
             last_instruction = ""
+            last_direction = None
 
         if asked_for_target and target_object:
             instruction, lost = navigator.step(target_object, objects, boxes)
+
+            direction = None
+            if "Move left" in instruction:
+                direction = "left"
+            elif "Move right" in instruction:
+                direction = "right"
+            elif "Go straight" in instruction:
+                direction = "straight"
+            elif "Stop" in instruction:
+                direction = "stop"
 
             if lost:
                 if navigator.frames_since_seen % 60 == 0:
@@ -67,13 +78,15 @@ def main():
 
             if navigator.last_bbox and target_reached(navigator.last_bbox, frame.shape):
                 instruction = "Stop. You have reached the object."
+                direction = "stop"
                 target_object = None
                 asked_for_target = False
                 navigator.last_bbox = None
 
-            if instruction != last_instruction:
+            if direction != last_direction or direction == "stop":
                 print(f"[NAV] {instruction}")
                 last_instruction = instruction
+                last_direction = direction
 
         cv2.imshow("Assistive Vision", frame)
 
