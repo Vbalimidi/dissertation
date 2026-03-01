@@ -19,7 +19,7 @@ class LlamaCaptioner:
         )
 
     def describe(self, frame, custom_prompt=None):
-        prompt = custom_prompt or "Describes what objects you see in the image of a room and their spatial relationships so that a visually impaired person can understand the scene. Be concise and use the format I see a [object] on the [location] of the room. There is a [object] next to it"
+        prompt = custom_prompt or "Describes what objects you see in the image of a room and their spatial relationships. Be concise and use the format I see a [object] on the [location] of the room. There is a [object] next to it"
         imageb64 = self.encode_frame(frame)
 
         response = self.client.chat.completions.create(
@@ -43,6 +43,6 @@ class LlamaCaptioner:
 
     @staticmethod
     def encode_frame(frame):
-        frame = cv2.resize(frame, (224, 224))
+        frame = cv2.resize(frame, (512, 512))
         _, buffer = cv2.imencode(".jpg", frame)
         return base64.b64encode(buffer).decode("utf-8")

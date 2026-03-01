@@ -1,33 +1,93 @@
-from gtts import gTTS
-import tempfile
 import os
+import tempfile
+from gtts import gTTS
 import threading
-import subprocess
+import sys
+import time
 
 class Speaker:
     def __init__(self):
         self.lock = threading.Lock()
 
-    def _speak(self, text):
-        with self.lock:
-            tts = gTTS(text=text, lang="en", slow=False)
+    def speak_blocking(self, text):
+        if not text:
+            return
+        print(f"[TTS] {text}")
+        self.lock.acquire()
+        try:
+            tts = gTTS(text=text, lang='en')
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as fp:
+                temp_path = fp.name
+                tts.save(temp_path)
+            os.system(f'afplay "{temp_path}"')
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+        except Exception as e:
+            print(f"TTS Error: {e}")
+        finally:
+            self.lock.release()
 
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as f:
-                path = f.name
-                tts.save(path)
+    def _play_audio(self, text):
+        self.lock.acquire()
+        try:
+            tts = gTTS(text=text, lang='en')
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as fp:
+                temp_path = fp.name
+                tts.save(temp_path)
+            os.system(f'afplay "{temp_path}"')
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+        except Exception as e:
+            print(f"TTS Error: {e}")
+        finally:
+            self.lock.release()
 
-            subprocess.run(
-                ["afplay", path],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
-            )
+    def speak(self, text):
+        if not text:
+            return
+        print(f"[TTS] {text}")
+        threading.Thread(target=self._play_audio, args=(text,), daemon=True).start()
 
-            os.remove(path)
 
-    def say(self, text):
-        if text:
-            threading.Thread(
-                target=self._speak,
-                args=(text,),
-                daemon=True
-            ).start()
+# import socket
+# import json
+# import threading
+
+# class Speaker:
+#     def __init__(self, host="127.0.0.1", port=12346):
+#         self.host = host
+#         self.port = port
+#         self.lock = threading.Lock()
+#         self.sock = None
+#         self._connect()
+
+#     def _connect(self):
+#         try:
+#             self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+#             self.sock.connect((self.host, self.port))
+#             print("[TTS] Connected to Pepper")
+#         except Exception as e:
+#             print(f"[TTS] Failed to connect to Pepper: {e}")
+#             self.sock = None
+
+#     def _send(self, text):
+#         if not self.sock:
+#             return
+
+#         with self.lock:
+#             try:
+#                 payload = json.dumps({"say": text})
+#                 self.sock.sendall(payload.encode("utf-8"))
+#             except Exception as e:
+#                 print(f"[TTS] Connection lost: {e}")
+#                 self.sock = None
+
+#     def say(self, text):
+#         if not text:
+#             return
+
+#         threading.Thread(
+#             target=self._send,
+#             args=(text,),
+#             daemon=True
+#         ).start()
