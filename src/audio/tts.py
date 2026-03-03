@@ -12,13 +12,21 @@ if not USE_DUSTY:
 
 
 class Speaker:
+    # Approximate speaking rate: ~120 words per minute for NAO robot
+    WORDS_PER_SECOND = 120.0 / 60.0  # ~2.0 words/sec
+
     def __init__(self):
         self.lock = threading.Lock()
         if USE_DUSTY:
             self.sock = None
-            self.host = "127.0.0.1" 
+            self.host = "192.168.1.53" 
             self.port = 12346
             self._connect()
+
+    def _estimate_duration(self, text):
+        """Estimate how long the robot takes to speak the text."""
+        word_count = len(text.split())
+        return max(1.0, word_count / self.WORDS_PER_SECOND + 0.5)
 
     def _connect(self):
         try:
@@ -42,6 +50,10 @@ class Speaker:
                     try:
                         payload = json.dumps({"say": text})
                         self.sock.sendall(payload.encode("utf-8"))
+                        # Wait for robot to finish speaking
+                        wait_time = self._estimate_duration(text)
+                        print(f"[TTS] Waiting {wait_time:.1f}s for robot to finish speaking")
+                        time.sleep(wait_time)
                     except Exception as e:
                         print(f"[TTS] Connection lost: {e}")
                         self.sock = None
@@ -89,47 +101,3 @@ class Speaker:
             return
         print(f"[TTS] {text}")
         threading.Thread(target=self._play_audio, args=(text,), daemon=True).start()
-
-
-# import socket
-# import json
-# import threading
-
-# class Speaker:
-#     def __init__(self, host="127.0.0.1", port=12346):
-#         self.host = host
-#         self.port = port
-#         self.lock = threading.Lock()
-#         self.sock = None
-#         self._connect()
-
-#     def _connect(self):
-#         try:
-#             self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-#             self.sock.connect((self.host, self.port))
-#             print("[TTS] Connected to Pepper")
-#         except Exception as e:
-#             print(f"[TTS] Failed to connect to Pepper: {e}")
-#             self.sock = None
-
-#     def _send(self, text):
-#         if not self.sock:
-#             return
-
-#         with self.lock:
-#             try:
-#                 payload = json.dumps({"say": text})
-#                 self.sock.sendall(payload.encode("utf-8"))
-#             except Exception as e:
-#                 print(f"[TTS] Connection lost: {e}")
-#                 self.sock = None
-
-#     def say(self, text):
-#         if not text:
-#             return
-
-#         threading.Thread(
-#             target=self._send,
-#             args=(text,),
-#             daemon=True
-#         ).start()

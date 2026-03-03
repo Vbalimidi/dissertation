@@ -2,7 +2,7 @@ import socket
 import json
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-sock.connect(('192.168.1.53', 12346))
+sock.connect(('127.0.0.1', 12346))
 while True:
     command = input()
     c = {"say": command}

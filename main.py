@@ -34,10 +34,10 @@ def main():
 		"what is in front of me"
 	]
 
-	print("Voice Assistive System Ready")
-	speaker.speak("Voice Assistive System Ready")
-	print("Say: 'describe the scene' or 'what's in front of me'.")
-	speaker.speak("Say describe the scene or what's in front of me.")
+	#print("Voice Assistive System Ready")
+	speaker.speak("Hello I am Dusty, I will be your voice Assistive Navigation System.")
+	#print("Say: 'describe the scene' or 'what's in front of me'.")
+	speaker.speak("Say describe or describe the scene.")
 
 	import time
 	wake_listen_interval = 0.5
