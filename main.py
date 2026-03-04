@@ -35,7 +35,7 @@ def main():
 	]
 
 	#print("Voice Assistive System Ready")
-	speaker.speak("Hello I am Dusty, I will be your voice Assistive Navigation System.")
+	speaker.speak("Hello I am Dusty, I will be your voice Assistive Navigation Guide.")
 	#print("Say: 'describe the scene' or 'what's in front of me'.")
 	speaker.speak("Say describe or describe the scene.")
 

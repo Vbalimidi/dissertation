@@ -1,4 +1,4 @@
-USE_DUSTY = True
+USE_DUSTY = False
 
 import os
 import tempfile
@@ -12,8 +12,8 @@ if not USE_DUSTY:
 
 
 class Speaker:
-    # Approximate speaking rate: ~120 words per minute for NAO robot
-    WORDS_PER_SECOND = 120.0 / 60.0  # ~2.0 words/sec
+    # Approximate speaking rate: ~160 words per minute for NAO robot
+    WORDS_PER_SECOND = 160.0 / 60.0  # ~2.5 words/sec
 
     def __init__(self):
         self.lock = threading.Lock()

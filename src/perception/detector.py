@@ -2,12 +2,13 @@ import cv2
 from ultralytics import YOLO
 
 class ObjectDetector:
-    def __init__(self, model_path="yolov8n.pt", conf=0.5):
+    def __init__(self, model_path="yolov8s.pt", conf=0.25, imgsz=1280):
         self.model = YOLO(model_path)
         self.conf = conf
+        self.imgsz = imgsz
 
     def detect(self, frame):
-        results = self.model(frame, conf=self.conf, verbose=False)
+        results = self.model(frame, conf=self.conf, imgsz=self.imgsz, verbose=False)
         objects = []
         boxes = []
 
